@@ -30,15 +30,30 @@ def inicializar_sessao():
         st.session_state.google_user = None
     if "login_rerun_done" not in st.session_state:
         st.session_state.login_rerun_done = False
+    credentials_dict = {
+        "client_id": st.secrets["google_auth"]["client_id"],
+        "client_secret": st.secrets["google_auth"]["client_secret"],
+        "project_id": st.secrets["google_auth"]["project_id"],
+        "auth_uri": st.secrets["google_auth"]["auth_uri"],
+        "token_uri": st.secrets["google_auth"]["token_uri"],
+        "auth_provider_x509_cert_url": st.secrets["google_auth"]["auth_provider_x509_cert_url"],
+        "redirect_uris": [st.secrets["google_auth"]["redirect_uri"]]
+    }
+
+    # Salva como JSON temporário
+    with open("google_credentials.json", "w") as f:
+        json.dump({"web": credentials_dict}, f)
+
+    # Usa no seu autenticador
     if 'connected' not in st.session_state:
         authenticator = Authenticate(
-            secret_credentials_path = 'google_credentials.json',
+            secret_credentials_path='google_credentials.json',
             cookie_name='my_cookie_name',
             cookie_key='this_is_secret',
-            redirect_uri = 'http://localhost:8501',
+            redirect_uri=st.secrets["google_auth"]["redirect_uri"],
         )
         st.session_state["authenticator"] = authenticator
-
+        
 def fazer_logout(authenticator):
     """Limpa dados da sessão no logout"""
     st.session_state.email = None
@@ -96,7 +111,7 @@ def main():
         # layout="wide",
         
     )
-    
+    import os 
     inicializar_sessao()
     
     # Autenticador
@@ -104,11 +119,11 @@ def main():
 
     # Interface principal
     if not st.session_state.connected:
-        mostrar_tela_login(authenticator)
+        mostrar_tela_login()
     else:
-        mostrar_area_logada(authenticator)
+        mostrar_area_logada()
 
-def mostrar_tela_login(authenticator):
+def mostrar_tela_login():
     """Exibe a tela de login/cadastro"""
     st.title("🔐 Sistema de Vendas")
     
@@ -167,7 +182,7 @@ def mostrar_tela_login(authenticator):
             else:
                 st.warning("Preencha todos os campos.")
 
-def mostrar_area_logada(authenticator):
+def mostrar_area_logada():
 
     if 'user_info' in st.session_state and st.session_state.email == None:
         processar_login_google()
@@ -184,7 +199,7 @@ def mostrar_area_logada(authenticator):
     
     with col2:
         if st.button("🔓 Sair", use_container_width=True):
-            fazer_logout(authenticator)
+            fazer_logout(st.session_state.authenticator)
     
     # Sidebar para administradores
     if st.session_state.is_admin:
@@ -198,7 +213,20 @@ def mostrar_area_logada(authenticator):
     else:
         user_page()
 
+import json
 
+credentials_dict = {
+    "client_id": st.secrets["google_auth"]["client_id"],
+    "client_secret": st.secrets["google_auth"]["client_secret"],
+    "project_id": st.secrets["google_auth"]["project_id"],
+    "auth_uri": st.secrets["google_auth"]["auth_uri"],
+    "token_uri": st.secrets["google_auth"]["token_uri"],
+    "auth_provider_x509_cert_url": st.secrets["google_auth"]["auth_provider_x509_cert_url"],
+    "redirect_uris": [st.secrets["google_auth"]["redirect_uri"]],
+}
+
+with open("google_credentials.json", "w") as f:
+    json.dump({"web": credentials_dict}, f)
 
 if __name__ == "__main__":
     main()

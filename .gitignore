@@ -4,3 +4,4 @@ vendas.db
 google*
 *__pycache__
 *.python*
+*.json*
