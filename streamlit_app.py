@@ -1,4 +1,5 @@
 import streamlit as st
+import json
 from app.database import init_db
 from app.auth import autenticar_usuario, cadastrar_usuario, cadastro_via_google
 from app import models
@@ -65,7 +66,7 @@ def fazer_logout(authenticator):
     if 'user_info' in st.session_state:
         st.session_state.user_info = None
         authenticator.logout()
-    
+    st.session_state.clear()
     st.rerun()
 
 def processar_login_google():
@@ -111,11 +112,7 @@ def main():
         # layout="wide",
         
     )
-    import os 
     inicializar_sessao()
-    
-    # Autenticador
-    authenticator = st.session_state["authenticator"]
 
     # Interface principal
     if not st.session_state.connected:
@@ -213,20 +210,6 @@ def mostrar_area_logada():
     else:
         user_page()
 
-import json
-
-credentials_dict = {
-    "client_id": st.secrets["google_auth"]["client_id"],
-    "client_secret": st.secrets["google_auth"]["client_secret"],
-    "project_id": st.secrets["google_auth"]["project_id"],
-    "auth_uri": st.secrets["google_auth"]["auth_uri"],
-    "token_uri": st.secrets["google_auth"]["token_uri"],
-    "auth_provider_x509_cert_url": st.secrets["google_auth"]["auth_provider_x509_cert_url"],
-    "redirect_uris": [st.secrets["google_auth"]["redirect_uri"]],
-}
-
-with open("google_credentials.json", "w") as f:
-    json.dump({"web": credentials_dict}, f)
 
 if __name__ == "__main__":
     main()

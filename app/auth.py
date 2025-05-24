@@ -35,8 +35,7 @@ def autenticar_usuario(email: str, senha : str, check_admin=False, is_google = F
 
     if resultado:
         senha_hash, is_admin = resultado
-        
-        if bcrypt.checkpw(senha.encode(), senha_hash.encode()):
+        if bcrypt.checkpw(senha.encode(), bytes(senha_hash)):
             if check_admin:
                 return bool(is_admin)
             return True

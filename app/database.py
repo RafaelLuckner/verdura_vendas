@@ -2,14 +2,15 @@ import psycopg2
 from psycopg2 import sql
 from dotenv import load_dotenv
 import os
+import streamlit as st
 
 load_dotenv()
 
-USER = os.getenv("user")
-PASSWORD = os.getenv("password")
-HOST = os.getenv("host")
-PORT = os.getenv("port")
-DBNAME = os.getenv("dbname")
+USER = st.secrets["postgres"]["user"]
+PASSWORD = st.secrets["postgres"]["password"]
+HOST = st.secrets["postgres"]["host"]
+PORT = st.secrets["postgres"]["port"]
+DBNAME = st.secrets["postgres"]["dbname"]
 
 def get_connection():
     return psycopg2.connect(
