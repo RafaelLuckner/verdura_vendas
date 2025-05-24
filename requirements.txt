@@ -8,3 +8,4 @@ pydantic[email]
 streamlit-google-auth==1.1.8
 sqlalchemy
 psycopg2-binary
+plotly
