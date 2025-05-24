@@ -1,0 +1,6 @@
+*.env
+*.streamlit
+vendas.db
+google*
+*__pycache__
+*.python*
