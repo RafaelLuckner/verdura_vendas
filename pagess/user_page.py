@@ -6,6 +6,7 @@ from app.models import PedidoCreate, ItemPedidoCreate
 import time
 from itertools import zip_longest
 
+
 def att_data( produtos=False, pedidos_by_user=False):
     """Atualiza os dados na sessão"""
 
@@ -78,6 +79,7 @@ def render_novo_pedido(user_id):
 
     st.markdown("Ajuste a quantidade desejada e veja o valor atualizado em tempo real.")
 
+    from streamlit_elements import elements, mui, html
     # Agrupar produtos de dois em dois
     for prod1, prod2 in zip_longest(*[iter(produtos_filtrados)]*2):
         col1, col2 = st.columns(2)
@@ -87,36 +89,58 @@ def render_novo_pedido(user_id):
                 continue
 
             with col:
-                with st.container(border=True, height=200):
-                    subcol1, subcol2 = st.columns([1.5, 1])
-
-                    with subcol1:
-                        st.markdown(f"**{produto.nome}**  \n R$ {produto.preco:.2f} por {produto.unidade}")
-
-                        qtd = st.number_input(
-                            "Quantidade",
-                            min_value=0,
-                            step=1,
-                            value=st.session_state.carrinho.get(produto.id, 0),
-                            key=f"qtd_{produto.id}_{produto.nome}",
-                            label_visibility="collapsed"
+                with st.container(border=True, height=270, key=f"produto_{produto.id}"):
+                    name_img = f"{produto.nome.replace(' ', '_').lower()}"
+                    with elements(f"produto_{produto.id}"):
+                        mui.Box(
+                            sx={
+                                "display": "flex",
+                                "flexDirection": "row",
+                                "alignItems": "center",
+                                "justifyContent": "space-between",
+                                "gap": 2,
+                                "flexWrap": "nowrap",
+                            }
+                        )(
+                            # Informações do produto
+                            mui.Box(
+                                sx={"flex": 1}
+                            )(
+                                mui.Typography(f"{produto.nome}", variant="h6"),
+                                mui.Typography(f"R$ {produto.preco:.2f} por {produto.unidade}", variant="body2"),
+                            ),
+                                # Imagem do produto
+                                mui.Box(
+                                    sx={"flex": "0 0 auto"}
+                                )(
+                                    html.img(
+                                        src=f"https://raw.githubusercontent.com/RafaelLuckner/verdura_vendas/main/imgs/{name_img}.png",
+                                        style={"maxWidth": "100px", "height": "100px"}
+                                    )
+                                )
+  
                         )
 
-                        if qtd > 0:
-                            st.session_state.carrinho[produto.id] = qtd
+                    # Campo de quantidade
+                    qtd = st.number_input(
+                        "Quantidade",
+                        min_value=0,
+                        step=1,
+                        value=st.session_state.carrinho.get(produto.id, 0),
+                        key=f"qtd_{produto.id}_{produto.nome}",
+                        label_visibility="collapsed"
+                    )
 
-                        elif produto.id in st.session_state.carrinho:
-                            del st.session_state.carrinho[produto.id]
+                    # Atualiza o carrinho
+                    if qtd > 0:
+                        st.session_state.carrinho[produto.id] = qtd
+                    elif produto.id in st.session_state.carrinho:
+                        del st.session_state.carrinho[produto.id]
 
-                        if qtd > 0:
-                            subtotal = qtd * float(produto.preco)
-                            st.write(f"Subtotal: **R$ {subtotal:.2f}**")
-
-                    with subcol2:
-                        try:
-                            st.image(f'imgs/{produto.nome.replace(" ", "_").lower()}.png')
-                        except:
-                            pass
+                    # Exibe o subtotal
+                    if qtd > 0:
+                        subtotal = qtd * float(produto.preco)
+                        st.markdown(f"Subtotal: **R$ {subtotal:.2f}**")
 
                             
 
