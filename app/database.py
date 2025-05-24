@@ -20,10 +20,35 @@ def get_connection():
         port=PORT,
         dbname=DBNAME
     )
+def get_connection():
+    return psycopg2.connect(
+        user=USER,
+        password=PASSWORD,
+        host=HOST,
+        port=PORT,
+        dbname=DBNAME
+    )
 
 def init_db():
     conn = get_connection()
     cursor = conn.cursor()
+
+    # Tabela de controle de inicialização
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
+    ''')
+
+    # Verifica se já foi inicializado
+    cursor.execute("SELECT value FROM metadata WHERE key = 'db_initialized'")
+    result = cursor.fetchone()
+
+    if result and result[0] == 'true':
+        cursor.close()
+        conn.close()
+        return  # Já inicializado, sai da função
 
     # Criar tabela usuarios
     cursor.execute('''
@@ -80,6 +105,9 @@ def init_db():
                 ON DELETE CASCADE
         );
     ''')
+
+    # Marcar como inicializado
+    cursor.execute("INSERT INTO metadata (key, value) VALUES ('db_initialized', 'true') ON CONFLICT (key) DO NOTHING;")
 
     conn.commit()
     cursor.close()

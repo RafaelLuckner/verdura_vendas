@@ -1,5 +1,6 @@
 import streamlit as st
 import json
+import time
 from app.database import init_db
 from app.auth import autenticar_usuario, cadastrar_usuario, cadastro_via_google
 from app import models
@@ -29,8 +30,7 @@ def inicializar_sessao():
         st.session_state.is_admin = False
     if "google_user" not in st.session_state:
         st.session_state.google_user = None
-    if "login_rerun_done" not in st.session_state:
-        st.session_state.login_rerun_done = False
+
     credentials_dict = {
         "client_id": st.secrets["google_auth"]["client_id"],
         "client_secret": st.secrets["google_auth"]["client_secret"],
@@ -98,21 +98,17 @@ def processar_login_google():
         
         st.success(f"Login realizado com sucesso! Bem-vindo(a), {email}")
         
-        # Rerun total na primeira autenticação
-        if not st.session_state.get("login_rerun_done", False):
-            st.session_state["login_rerun_done"] = True
-            st.rerun()
 
 def main():
-    # Configurações iniciais
+
     init_db()
     st.set_page_config(
         page_title="Login - Sistema de Vendas",
         page_icon="🔐",
         # layout="wide",
-        
     )
     inicializar_sessao()
+
 
     # Interface principal
     if not st.session_state.connected:
@@ -157,12 +153,18 @@ def mostrar_tela_login():
         with st.container():
             st.write("**Ou faça login com Google:**")
             # Catch the login event
+            authorization_url = st.session_state["authenticator"].get_authorization_url()
+            st.markdown(f"""
+                        <a href="{authorization_url}" target="_self" style="text-decoration: none;">
+                            <button style="display: flex; align-items: center; gap: 8px; background-color: white; border: 1px solid #ccc; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                                <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google Logo" style="width: 20px; height: 20px;">
+                                <span style="color: #444; font-weight: bold;">Login com o Google</span>
+                            </button>
+                        </a>
+                    """, unsafe_allow_html=True)
             st.session_state["authenticator"].check_authentification()
-
-            # Create the login button
-            st.session_state["authenticator"].login()
-            processar_login_google()
         
+
     else:  # Cadastro
         st.subheader("Criar Conta")
         
@@ -180,10 +182,11 @@ def mostrar_tela_login():
                 st.warning("Preencha todos os campos.")
 
 def mostrar_area_logada():
+    st.session_state["authenticator"].check_authentification()
 
     if 'user_info' in st.session_state and st.session_state.email == None:
         processar_login_google()
-        
+
     # Header com informações do usuário
     col1, col2 = st.columns([3, 1])
     

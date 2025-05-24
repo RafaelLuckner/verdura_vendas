@@ -5,6 +5,8 @@ from app.crud import listar_produtos, criar_pedido, listar_pedidos, excluir_pedi
 from app.models import PedidoCreate, ItemPedidoCreate
 import time
 from itertools import zip_longest
+from streamlit_elements import elements, mui, html
+
 
 
 def att_data( produtos=False, pedidos_by_user=False):
@@ -24,9 +26,6 @@ def render():
     """Renderiza a página do usuário"""
     st.title(f"🛒 {st.session_state.email.split('@')[0]}")
     
-    # Inicializar dados na sessão
-    if 'pedidos' not in st.session_state:
-        st.session_state.pedidos = listar_pedidos()
     if 'produtos' not in st.session_state:
         st.session_state.produtos = listar_produtos()
     if 'pedidos_by_user' not in st.session_state:
@@ -60,9 +59,6 @@ def render_novo_pedido(user_id):
     if 'carrinho' not in st.session_state:
         st.session_state.carrinho = {}
     # Faça uma cópia local
-    carrinho_temp = st.session_state.carrinho.copy()
-
-    st.subheader("✨ Escolha seus produtos")
 
     # Campo de pesquisa
     termo_pesquisa = st.text_input("🔍 Pesquisar produto", placeholder="Digite o nome do produto...").strip().lower()
@@ -79,7 +75,6 @@ def render_novo_pedido(user_id):
 
     st.markdown("Ajuste a quantidade desejada e veja o valor atualizado em tempo real.")
 
-    from streamlit_elements import elements, mui, html
     # Agrupar produtos de dois em dois
     for prod1, prod2 in zip_longest(*[iter(produtos_filtrados)]*2):
         col1, col2 = st.columns(2)
@@ -199,8 +194,6 @@ def render_novo_pedido(user_id):
                 st.error(f"⚠️ Ocorreu um erro ao criar o pedido: {str(e)}")
     else:
         st.info("👆 Para começar, selecione a quantidade de um ou mais produtos acima, ou visualize seus pedidos na aba Meus Pedidos")
-
-
 
 def render_meus_pedidos(user_id):
     """Renderiza a aba dos pedidos do usuário"""

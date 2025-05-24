@@ -102,6 +102,8 @@ def render_produtos():
                     "ativo": st.column_config.SelectboxColumn("Status", options=["Ativo", "Inativo"])
                 }
             )
+
+            # 
             
             # Salvar edições
             if st.button("💾 Salvar Alterações"):
