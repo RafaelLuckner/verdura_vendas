@@ -2,25 +2,22 @@ import streamlit as st
 import json
 import time
 from app.database import init_db
-from app.auth import autenticar_usuario, cadastrar_usuario, cadastro_via_google
+from app.auth import autenticar_usuario, cadastrar_usuario, cadastro_via_google, atualizar_username_usuario
 from app import models
-from streamlit_google_auth import Authenticate
 
 from pagess.admin_page import render as admin_page
 from pagess.user_page import render as user_page
 
+def validar_username(username):
+    """Valida se o username é válido"""
+    if not username or len(username) < 3:
+        st.error("Nome de usuário deve ter pelo menos 3 caracteres.")
+        return False
+    if len(username) > 20:
+        st.error("Nome de usuário deve ter no máximo 20 caracteres.")
+        return False
 
-def validar_info(email, senha):
-    try:
-        models.UsuarioBase(email=email)
-    except:
-        st.error("Formato de e-mail inválido.")
-        st.stop()
-    try:
-        models.UsuarioCreate(email=email, senha=senha)
-    except:
-        st.error("Formato de senha inválido. (mínimo 6 caracteres)")
-        st.stop()
+    return True
 
 def inicializar_sessao():
     """Inicializa as variáveis de sessão necessárias"""
@@ -30,190 +27,190 @@ def inicializar_sessao():
         st.session_state.is_admin = False
     if "google_user" not in st.session_state:
         st.session_state.google_user = None
+    if "needs_username" not in st.session_state:
+        st.session_state.needs_username = False
+    if "username" not in st.session_state:
+        st.session_state.username = None
 
-    credentials_dict = {
-        "client_id": st.secrets["google_auth"]["client_id"],
-        "client_secret": st.secrets["google_auth"]["client_secret"],
-        "project_id": st.secrets["google_auth"]["project_id"],
-        "auth_uri": st.secrets["google_auth"]["auth_uri"],
-        "token_uri": st.secrets["google_auth"]["token_uri"],
-        "auth_provider_x509_cert_url": st.secrets["google_auth"]["auth_provider_x509_cert_url"],
-        "redirect_uris": [st.secrets["google_auth"]["redirect_uri"]]
-    }
-
-    # Salva como JSON temporário
-    with open("google_credentials.json", "w") as f:
-        json.dump({"web": credentials_dict}, f)
-
-    # Usa no seu autenticador
-    if 'connected' not in st.session_state:
-        authenticator = Authenticate(
-            secret_credentials_path='google_credentials.json',
-            cookie_name='my_cookie_name',
-            cookie_key='this_is_secret',
-            redirect_uri=st.secrets["google_auth"]["redirect_uri"],
-        )
-        st.session_state["authenticator"] = authenticator
-        
-def fazer_logout(authenticator):
+def fazer_logout():
     """Limpa dados da sessão no logout"""
     st.session_state.email = None
     st.session_state.is_admin = False
     st.session_state.google_user = None
-    st.session_state.login_rerun_done = False
+    st.session_state.needs_username = False
+    st.session_state.username = None
     
-    # Logout do Google se autenticado
-    if 'user_info' in st.session_state:
-        st.session_state.user_info = None
-        authenticator.logout()
-    st.session_state.clear()
-    st.rerun()
+    # Logout do Google
+    st.logout()
 
 def processar_login_google():
-    print('---')
-    print("Processando login via Google...")
-    if 'user_info' in st.session_state and st.session_state.connected == True:
-        email = st.session_state['user_info'].get('email')
-        nome = st.session_state['user_info'].get('name')
-        print("pass0")
+    """Processa o login via Google e verifica se precisa definir username"""
+    print('Processando login via Google...')
+    
+    if st.user.is_logged_in:
+        user_info = st.user
+        email = user_info.get('email')
+        nome = user_info.get('name')
         
-        # Cadastra o usuário via Google se não existir
-        cadastro_via_google(email)
-        
-        # Verifica se é admin
-        st.session_state.is_admin = autenticar_usuario(
-            email, 
-            senha='', 
-            check_admin=True, 
-            is_google=True
-        )
-        
-        # Define como conectado
+        # Atualiza o email na sessão
         st.session_state.email = email
-        st.session_state.google_user = {
-            'email': email,
-            'name': nome,
-            'picture': st.session_state['user_info'].get('picture')
-        }
         
-        st.success(f"Login realizado com sucesso! Bem-vindo(a), {email}")
+        # Verifica se é um novo usuário ou se já tem username definido
+        usuario_existente = cadastro_via_google(email)
         
+        if not usuario_existente or not usuario_existente.get('username'):
+            # Novo usuário ou usuário sem username - precisa definir
+            st.session_state.needs_username = True
+            st.session_state.google_user = {
+                'email': email,
+                'name': nome,
+                'picture': user_info.get('picture')
+            }
+        else:
+            # Usuário existente com username - login completo
+            finalizar_login(email, nome, usuario_existente.get('username'))
+
+def finalizar_login(email, nome, username):
+    """Finaliza o processo de login após ter username definido"""
+    # Verifica se é admin
+    st.session_state.is_admin = autenticar_usuario(
+        email, 
+        senha='', 
+        check_admin=True, 
+        is_google=True
+    )
+    
+    # Define dados do usuário
+    st.session_state.google_user = {
+        'email': email,
+        'name': nome,
+        'username': username
+    }
+    st.session_state.username = username
+    st.session_state.needs_username = False
+    
+    st.success(f"Bem-vindo(a), {username}!")
 
 def main():
-
     init_db()
     st.set_page_config(
         page_title="Login - Sistema de Vendas",
         page_icon="🔐",
-        # layout="wide",
     )
     inicializar_sessao()
 
+    # Verifica se o usuário está logado via Google
+    if st.user.is_logged_in and not st.session_state.email:
+        processar_login_google()
 
     # Interface principal
-    if not st.session_state.connected:
+    if not st.user.is_logged_in:
         mostrar_tela_login()
+    elif st.session_state.needs_username:
+        mostrar_tela_username()
     else:
         mostrar_area_logada()
 
 def mostrar_tela_login():
-    """Exibe a tela de login/cadastro"""
+    """Exibe a tela de login apenas com Google"""
     st.title("🔐 Sistema de Vendas")
+    st.subheader("Faça login com sua conta Google")
     
-    aba = st.radio("Acesso ao sistema", ["Login", "Cadastro"], horizontal=True)
+    # Informações sobre o sistema
+    st.info("🔹 Acesso seguro através da sua conta Google")
+    st.info("🔹 Primeiro acesso? Você poderá escolher seu nome de usuário")
     
-    if aba == "Login":
-        st.subheader("Fazer Login")
-        
-        # Login tradicional
-        with st.container():
-            st.write("**Login com email e senha:**")
-            email = st.text_input("Email", key="login_email")
-            senha = st.text_input("Senha", type="password", key="login_senha")
-            
-            if st.button("Entrar", type="primary", use_container_width=True):
-                if email and senha:
-                    validar_info(email, senha)
-                    if autenticar_usuario(email, senha):
-                        st.session_state.is_admin = autenticar_usuario(
-                            email, senha, check_admin=True
-                        )
-                        st.session_state.connected = True
-                        st.session_state.email = email
-                        st.success("Login realizado com sucesso!")
-                        st.rerun()
-                    else:
-                        st.error("Credenciais inválidas.")
-                else:
-                    st.warning("Preencha todos os campos.")
-        
-        st.divider()
-        
-        # Login com Google
-        with st.container():
-            st.write("**Ou faça login com Google:**")
-            # Catch the login event
-            authorization_url = st.session_state["authenticator"].get_authorization_url()
-            st.markdown(f"""
-                        <a href="{authorization_url}" target="_self" style="text-decoration: none;">
-                            <button style="display: flex; align-items: center; gap: 8px; background-color: white; border: 1px solid #ccc; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
-                                <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google Logo" style="width: 20px; height: 20px;">
-                                <span style="color: #444; font-weight: bold;">Login com o Google</span>
-                            </button>
-                        </a>
-                    """, unsafe_allow_html=True)
-            st.session_state["authenticator"].check_authentification()
-        
+    # Login com Google
+    with st.container():
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🔑 Entrar com Google", type="primary", use_container_width=True):
+                st.login("google")
 
-    else:  # Cadastro
-        st.subheader("Criar Conta")
-        
-        email = st.text_input("Email para cadastro", key="cadastro_email")
-        senha = st.text_input("Senha", type="password", key="cadastro_senha")
-        
-        if st.button("Cadastrar", type="primary", use_container_width=True):
-            if email and senha:
-                validar_info(email, senha)
-                if cadastrar_usuario(email, senha):
-                    st.success("Cadastro realizado com sucesso! Faça login.")
+def mostrar_tela_username():
+    """Exibe a tela para definir username no primeiro acesso"""
+    st.title("👋 Bem-vindo ao Sistema!")
+    st.subheader("Defina seu nome de usuário")
+    
+    # Informações do usuário do Google
+    if st.session_state.google_user:
+
+        st.write(f"**Email:** {st.session_state.google_user['email']}")
+        st.write(f"**Nome:** {st.session_state.google_user['name']}")
+    
+    st.divider()
+    
+    # Formulário para definir username
+    st.write("**Escolha seu nome de usuário para podermos te identificar:**")
+    st.caption("Este será o nome exibido no sistema. Você pode alterá-lo depois nas configurações.")
+    
+    username = st.text_input(
+        "Nome de usuário",
+        placeholder="Digite seu nome de usuário (3-20 caracteres)",
+        help="Apenas letras, números, _ e - são permitidos"
+    )
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        if st.button("✅ Confirmar", type="primary", use_container_width=True):
+            username = username.replace(' ', '_')
+            if validar_username(username):
+                # Tenta atualizar o username no banco
+                if atualizar_username_usuario(st.session_state.google_user['email'], username):
+                    finalizar_login(
+                        st.session_state.google_user['email'],
+                        st.session_state.google_user['name'],
+                        username
+                    )
+                    st.rerun()
                 else:
-                    st.error("Erro: e-mail já cadastrado.")
-            else:
-                st.warning("Preencha todos os campos.")
+                    st.error("Nome de usuário já está em uso. Tente outro.")
+    
+    with col2:
+        if st.button("🔄 Usar nome do Google", use_container_width=True):
+            nome_google = st.session_state.google_user.get('name', '').replace(' ', '_')
+            if validar_username(nome_google):
+                if atualizar_username_usuario(st.session_state.google_user['email'], nome_google):
+                    finalizar_login(
+                        st.session_state.google_user['email'],
+                        st.session_state.google_user['name'],
+                        nome_google
+                    )
+                    st.rerun()
+                else:
+                    st.error("Nome baseado no Google já está em uso. Digite um nome personalizado.")
 
 def mostrar_area_logada():
-    st.session_state["authenticator"].check_authentification()
-
-    if 'user_info' in st.session_state and st.session_state.email == None:
-        processar_login_google()
-
+    """Exibe a área principal do sistema após login completo"""
     # Header com informações do usuário
     col1, col2 = st.columns([3, 1])
     
     with col1:
-        if st.session_state.google_user and st.session_state.google_user.get('name'):
-            st.write(f"**Olá, {st.session_state.google_user.get('email')}!**")
-
+        if st.session_state.google_user:
+            st.write(f"**{st.session_state.google_user.get('username', 'Usuário')}**")
+            st.caption(f"{st.session_state.google_user.get('email', '')}")
         else:
-            st.write(f"**Olá, {st.session_state.email}!**")
+            st.write(f"**Olá, {st.session_state.username or st.session_state.email}!**")
     
     with col2:
         if st.button("🔓 Sair", use_container_width=True):
-            fazer_logout(st.session_state.authenticator)
+            fazer_logout()
+            st.rerun()
+    
+    st.divider()
     
     # Sidebar para administradores
     if st.session_state.is_admin:
-        menu_option = st.sidebar.radio(
-            "Menu",
-            ["Produtos", "Pedidos", "Usuários"]
-        )
-
+        with st.sidebar:
+            st.success("🔐 Acesso Administrativo")
+            menu_option = st.radio(
+                "Menu Administrativo",
+                ["Produtos", "Pedidos", "Usuários"]
+            )
         admin_page(menu_option)
-
     else:
         user_page()
 
-
 if __name__ == "__main__":
     main()
-    # st.session_state
