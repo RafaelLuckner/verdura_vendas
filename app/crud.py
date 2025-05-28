@@ -25,10 +25,10 @@ def listar_produtos():
         ProdutoDB(id=row[0], nome=row[1], preco=row[2], unidade=row[3], ativo=row[4])
         for row in rows
     ]
-def listar_usuarios():
+def listar_usuarios(email= True, nome = False):
     with get_connection() as conn:
         with conn.cursor() as cursor:
-            cursor.execute('SELECT id, email FROM usuarios')
+            cursor.execute(f'SELECT id{f', email'if email else ''} {f', username 'if nome else ''}FROM usuarios')
             rows = cursor.fetchall()
     return rows
 

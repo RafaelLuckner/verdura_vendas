@@ -128,7 +128,7 @@ def render_novo_pedido():
                                 )
   
                         )
-
+                    
                     # Campo de quantidade
                     qtd = st.number_input(
                         "Quantidade",
@@ -138,10 +138,12 @@ def render_novo_pedido():
                         key=f"qtd_{produto.id}_{produto.nome}",
                         label_visibility="collapsed"
                     )
-
+                    
                     # Atualiza o carrinho
                     if qtd > 0:
                         st.session_state.carrinho[produto.id] = qtd
+                        st.write(st.session_state.carrinho[produto.id] )
+
                     elif produto.id in st.session_state.carrinho:
                         del st.session_state.carrinho[produto.id]
 
@@ -150,7 +152,7 @@ def render_novo_pedido():
                         subtotal = qtd * float(produto.preco)
                         st.markdown(f"Subtotal: **R$ {subtotal:.2f}**")
 
-                            
+                
 
     if st.session_state.carrinho:
         st.subheader("📦 Resumo do Pedido")
@@ -198,79 +200,236 @@ def render_novo_pedido():
                 )
 
                 criar_pedido(pedido)
-                st.success(f"Pedido criado com sucesso!")
+                st.session_state.ja_pediu = True
                 st.session_state.carrinho = {}
-                time.sleep(4)
                 att_data(pedidos_by_user=True)
+                st.rerun()
 
             except Exception as e:
                 st.error(f"⚠️ Ocorreu um erro ao criar o pedido: {str(e)}")
+
+    elif 'ja_pediu' in st.session_state and st.session_state.ja_pediu:
+        st.success("✅ Pedido criado com sucesso!")
+        st.info("📦 Seus pedidos podem ser visualizados na aba Meus Pedidos")
+
     else:
         st.info("👆 Para começar, selecione a quantidade de um ou mais produtos acima, ou visualize seus pedidos na aba Meus Pedidos")
 
 def render_meus_pedidos():
-    """Renderiza a aba dos pedidos do usuário"""
-    st.header("Meus Pedidos")
-    
+    """Renderiza a aba dos pedidos do usuário - Versão Mobile Otimizada"""
+
+
     # Filtrar pedidos do usuário
     meus_pedidos = st.session_state.pedidos_by_user
     if not meus_pedidos:
-        st.info("Você ainda não fez nenhum pedido.")
+        st.empty()
+        st.info("📦 Você ainda não fez nenhum pedido.")
+        st.markdown("---")
+        st.write("💡 **Dica:** Vá para a aba 'Fazer Pedido' para começar!")
         return
-    
-    # Estatísticas rápidas
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("Total", len(meus_pedidos))
-    with col2:
-        pendentes = len([p for p in meus_pedidos if p.status == "Pendente"])
-        st.metric("Pendentes", pendentes)
-    with col3:
-        total_gasto = sum(float(p.total) for p in meus_pedidos)
-        st.metric("Gasto", f"R$ {total_gasto:.0f}")
-    
-    # Lista de pedidos (mais recentes primeiro)
-    meus_pedidos_ordenados = sorted(meus_pedidos, key=lambda x: x.data, reverse=True)
-    
-    for pedido in meus_pedidos_ordenados:
-        # Status emoji
-        status_emoji = {
-            "Pendente": "⏳",
-            "Aprovado": "✅", 
-            "Cancelado": "❌"
-        }.get(pedido.status, "❓")
-        
-        with st.expander(
-            f"{status_emoji} Pedido #{pedido.id} - {pedido.data.strftime('%d/%m')} - R$ {pedido.total:.2f}"
-        ):
-            # Informações do pedido
-            st.write(f"**Data:** {pedido.data.strftime('%d/%m/%Y')}")
-            st.write(f"**Status:** {pedido.status}")
-            
-            # Itens do pedido
-            if pedido.itens:
-                st.write("**Itens:**")
-                produtos = st.session_state.produtos
-                
-                for item in pedido.itens:
-                    produto = next((p for p in produtos if p.id == item.produto_id), None)
-                    if produto:
-                        subtotal = item.quantidade * item.preco_unitario
-                        st.write(f"• {produto.nome} - {item.quantidade}x = R$ {subtotal:.2f}")
-            
-            st.write(f"**Total: R$ {pedido.total:.2f}**")
-            
-            # Ação de cancelar (apenas para pedidos pendentes)
-            if pedido.status == "Pendente":
-                if st.button(f"🗑️ Cancelar Pedido", key=f"cancel_{pedido.id}"):
-                    if excluir_pedido(pedido.id):
-                        st.success("Pedido cancelado!")
-                        time.sleep(1)
-                        att_data(pedidos_by_user=True)
-                    else:
-                        st.error("Erro ao cancelar pedido.")
 
+    # === ESTATÍSTICAS EM CARDS VERTICAIS (MELHOR PARA MOBILE) ===
+    st.subheader("📊 Resumo")
+
+    # Layout em 3 cards verticais
+    total_pedidos = len(meus_pedidos)
+    pendentes = len([p for p in meus_pedidos if p.status == "Pendente"])
+    aprovados = len([p for p in meus_pedidos if p.status == "Aprovado"])
+    cancelados = len([p for p in meus_pedidos if p.status == "Cancelado"])
+    total_gasto = sum(float(p.total) for p in meus_pedidos)
+
+    # Cards de estatísticas
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric(
+            label="📝 Total de Pedidos",
+            value=total_pedidos,
+            help="Total de pedidos realizados"
+        )
+
+    with col2:
+        st.metric(
+            label="⏳ Pendentes",
+            value=pendentes,
+            delta="Aguardando" if pendentes > 0 else "Em dia",
+            help="Pedidos aguardando aprovação",delta_color="inverse"
+        )
+
+    with col3:
+        st.metric(
+            label="⏳ Aprovados",
+            value=aprovados,
+            delta="Confirmados" if aprovados > 0 else "Em dia",
+            help="Pedidos Aprovados"
+        )
+
+
+    # === FILTROS RÁPIDOS ===
+    st.markdown("---")
+    st.subheader("🔍 Filtrar Pedidos")
+
+    # Filtro por status em linha única
+    status_filtro = st.selectbox(
+        "Status dos pedidos",
+        ["Todos", "Pendente", "Aprovado", "Cancelado"],
+        help="Filtrar pedidos por status"
+    )
+
+    # Aplicar filtro
+    if status_filtro == "Todos":
+        pedidos_filtrados = meus_pedidos
+    else:
+        pedidos_filtrados = [p for p in meus_pedidos if p.status == status_filtro]
+
+    # === LISTA DE PEDIDOS OTIMIZADA PARA MOBILE ===
+    st.markdown("---")
+    st.subheader(f"📋 Seus Pedidos ({len(pedidos_filtrados)})")
+
+    if not pedidos_filtrados:
+        st.warning(f"Nenhum pedido encontrado com status '{status_filtro}'")
+    else:
+        # Ordenar pedidos (mais recentes primeiro)
+        pedidos_ordenados = sorted(pedidos_filtrados, key=lambda x: x.data, reverse=True)
+        
+        for i, pedido in enumerate(pedidos_ordenados):
+            # Status emoji e cor
+            status_config = {
+                "Pendente": {"emoji": "⏳", "color": "#FFA500"},
+                "Aprovado": {"emoji": "✅", "color": "#28A745"},
+                "Cancelado": {"emoji": "❌", "color": "#DC3545"}
+            }
+            
+            config = status_config.get(pedido.status, {"emoji": "❓", "color": "#0F1214"})
+            
+            # Card do pedido com design mobile-first
+            with st.container():
+                # Header do pedido
+                col_header1, col_header2 = st.columns([3, 1])
+                
+                with col_header1:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(90deg, {config['color']}15 0%, transparent 100%); 
+                            padding: 10px; border-left: 4px solid {config['color']}; border-radius: 0 8px 8px 0; margin: 5px 0;">
+                        <h4 style="margin: 0; color: {config['color']};">
+                            {config['emoji']} Pedido #{pedido.id}
+                        </h4>
+                        <p style="margin: 5px 0; font-size: 14px; color: #666;">
+                            📅 {pedido.data.strftime('%d/%m/%Y')} • 💰 R$ {pedido.total:.2f}
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col_header2:
+                    # Botão de expandir/recolher
+                    expandir_key = f"expand_{pedido.id}"
+                    if expandir_key not in st.session_state:
+                        st.session_state[expandir_key] = False
+                    
+                    if st.button("Ver Mais" if not st.session_state[expandir_key] else "Ver Menos", 
+                            key=f"toggle_{pedido.id}",
+                            help="Ver detalhes"):
+                        st.session_state[expandir_key] = not st.session_state[expandir_key]
+                        st.rerun()
+                
+                # Detalhes expandíveis
+                if st.session_state[expandir_key]:
+                    with st.container():
+                        # Informações detalhadas
+                        st.markdown(f"""
+                        <div style=" padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <p><strong>📅 Data completa:</strong> {pedido.data.strftime('%d/%m/%Y às %H:%M')}</p>
+                            <p><strong>📊 Status:</strong> {config['emoji']} {pedido.status}</p>
+                            <p><strong>🛍️ Quantidade de itens:</strong> {len(pedido.itens)}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Lista de itens do pedido
+                        if pedido.itens:
+                            st.write("**🛒 Itens do Pedido:**")
+                            produtos = st.session_state.produtos
+                            
+                            # Container para itens
+                            for j, item in enumerate(pedido.itens):
+                                produto = next((p for p in produtos if p.id == item.produto_id), None)
+                                if produto:
+                                    subtotal = item.quantidade * item.preco_unitario
+                                    
+                                    # Card para cada item
+                                    st.markdown(f"""
+                                    <div style=" padding: 10px; margin: 5px 0; 
+                                            border-radius: 6px; border: 1px solid #e9ecef;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                <strong>{produto.nome}</strong><br>
+                                                <small style="color: #666;">
+                                                    {item.quantidade:.0f}x R$ {item.preco_unitario:.2f}
+                                                </small>
+                                            </div>
+                                            <div style="text-align: right;">
+                                                <strong style="color: #28A745;">R$ {subtotal:.2f}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                        
+                        # Total destacado
+                        st.markdown(f"""
+                        <div style="background: linear-gradient(45deg, #28A745, #20C997); color: white; 
+                                padding: 15px; border-radius: 8px; text-align: center; margin: 10px 0;">
+                            <h3 style="margin: 0;">💰 Total: R$ {pedido.total:.2f}</h3>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Ações do pedido
+                        if pedido.status == "Pendente":
+                            st.markdown("---")
+                            st.write("**⚡ Ações Disponíveis:**")
+                            
+                            # Confirmação de cancelamento
+                            cancel_key = f"cancel_confirm_{pedido.id}"
+                            if cancel_key not in st.session_state:
+                                st.session_state[cancel_key] = False
+                            
+                            if not st.session_state[cancel_key]:
+                                if st.button(f"🗑️ Cancelar Pedido #{pedido.id}", 
+                                        key=f"cancel_btn_{pedido.id}",
+                                        use_container_width=True,
+                                        type="secondary"):
+                                    st.session_state[cancel_key] = True
+                                    st.rerun()
+                            else:
+                                st.warning("⚠️ **Confirmar cancelamento do pedido?**")
+                                col_confirm1, col_confirm2 = st.columns(2)
+                                
+                                with col_confirm1:
+                                    if st.button("✅ Sim, Cancelar", 
+                                            key=f"confirm_yes_{pedido.id}",
+                                            use_container_width=True,
+                                            type="primary"):
+                                        if excluir_pedido(pedido.id):
+                                            st.success("✅ Pedido cancelado com sucesso!")
+                                            time.sleep(1.5)
+                                            att_data(pedidos_by_user=True)
+                                            st.rerun()
+                                        else:
+                                            st.error("❌ Erro ao cancelar pedido.")
+                                
+                                with col_confirm2:
+                                    if st.button("❌ Não, Manter", 
+                                            key=f"confirm_no_{pedido.id}",
+                                            use_container_width=True):
+                                        st.session_state[cancel_key] = False
+                                        st.rerun()
+                        
+                        elif pedido.status == "Aprovado":
+                            st.success("✅ **Pedido aprovado!** Aguarde o preparo.")
+                        elif pedido.status == "Cancelado":
+                            st.info("ℹ️ **Pedido cancelado.** Você pode fazer um novo pedido a qualquer momento.")
+                
+                # Separador visual entre pedidos
+                if i < len(pedidos_ordenados) - 1:
+                    st.markdown("<hr style='margin: 20px 0; border: 1px solid #e9ecef;'>", unsafe_allow_html=True)
 
 def pagina_configuracoes():
     st.header("⚙️ Configurações da Conta")

@@ -89,7 +89,6 @@ def finalizar_login(email, nome, username):
     st.session_state.username = username
     st.session_state.needs_username = False
     
-    st.success(f"Bem-vindo(a), {username}!")
 
 def main():
     init_db()
@@ -113,7 +112,7 @@ def main():
 
 def mostrar_tela_login():
     """Exibe a tela de login apenas com Google"""
-    st.title("🔐 Sistema de Vendas")
+    st.title("🥬 Vendas Verduras Flora")
     st.subheader("Faça login com sua conta Google")
     
     # Informações sobre o sistema

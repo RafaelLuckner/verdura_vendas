@@ -1,3 +1,4 @@
+from narwhals import col
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date
@@ -15,8 +16,7 @@ def att_data(pedidos= False, produtos= False, users=False):
     if produtos:
         st.session_state.produtos = listar_produtos()
     if users:
-        st.session_state.users = listar_usuarios()
-    st.rerun()
+        st.session_state.users = listar_usuarios(email= False, nome= True)
 
 def render():
     """Renderiza a página do administrador baseada na opção do menu"""
@@ -33,9 +33,12 @@ def render():
     if 'produtos' not in st.session_state:
         st.session_state.produtos = listar_produtos()
     
+    with st.sidebar:
+        st.button("Atualizar Dados", on_click=att_data, args=(True, True, True), use_container_width=True)
+
     pg = st.navigation([
-        st.Page(render_produtos, title="Produtos", icon="👤"),
-        st.Page(render_pedidos, title="Pedidos", icon="🛠️"),
+        st.Page(render_produtos, title="Produtos", icon="🥬",),
+        st.Page(render_pedidos, title="Pedidos", icon="📦"),
         st.Page(pagina_configuracoes, title="Configurações", icon="⚙️")
     ])
     pg.run()
@@ -45,10 +48,6 @@ def render_produtos():
     produtos = st.session_state.produtos
     users = st.session_state.users
     pedidos = st.session_state.pedidos
-
-    if st.button("Atualizar", key = 'asfweaf', ):
-        att_data(pedidos=True, produtos=True, users=True)
-
     
     tab1, tab2, tab3 = st.tabs(["Lista de Produtos", "Adicionar Produto", "Relatórios"])
     
@@ -211,101 +210,292 @@ def render_pedidos():
     users = st.session_state.users
     pedidos = st.session_state.pedidos
 
-    if st.button("Atualizar", type="primary", key="atualizar_pedidos"):
-        att_data(pedidos=True, produtos=True, users=True)
-    
-    tab1, tab2, tab3 = st.tabs(["Lista de Pedidos", "Criar Pedido", "Relatórios"])
-    
+    tab1, tab2, tab3 = st.tabs(["📋 Lista de Pedidos", "➕ Criar Pedido", "📊 Relatórios"])
+
+
     with tab1:
-        st.subheader("Pedidos Recentes")
-    
-        df_pedidos = pd.DataFrame([{
-            "id": p.id,
-            "usuario_id": p.usuario_id,
-            "email": [u[1] for u in users if u[0] == p.usuario_id],
-            "data": p.data.strftime('%Y-%m-%d %H:%M'),
-            "status": p.status,
-            "valor": float(p.total),
-            "itens": len(p.itens)
-        } for p in pedidos])
+        st.header("🛍️ Gestão de Pedidos")
+        
+        # Função auxiliar para obter datas válidas (terça, quinta, sábado)
+        def obter_datas_validas():
+            """Retorna lista de datas dos últimos 30 dias que são terça, quinta ou sábado"""
+            from datetime import datetime, timedelta
+            
+            datas_validas = []
+            data_atual = datetime.now().date()
+            
+            for i in range(15):  # Últimos 30 dias
+                data = data_atual + timedelta(days=i)
+                dia_semana = data.weekday()  # 0=segunda, 1=terça, 2=quarta, 3=quinta, 4=sexta, 5=sábado, 6=domingo
+                
+                if dia_semana in [1, 3, 5]:  # terça=1, quinta=3, sábado=5
+                    nome_dia = {1: "Terça", 3: "Quinta", 5: "Sábado"}[dia_semana]
+                    datas_validas.append({
+                        'data': data,
+                        'label': f"{nome_dia}, {data.day:02d}/{data.month:02d}",
+                        'dia_semana': nome_dia
+                    })
+            
+            return sorted(datas_validas, key=lambda x: x['data'], reverse=False)
 
-        if df_pedidos.empty:
-            st.warning("Nenhum pedido encontrado.")
-        else:
-            # Filtros
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                filtro_status = st.selectbox("Status", ["Todos", "Pendente", "Aprovado", "Cancelado"])
-            with col2:
-                data_inicio = st.date_input("Data Início", date(2024, 5, 1))
-            with col3:
-                data_fim = st.date_input("Data Fim", date.today())
+        # Preparar dados dos pedidos
+        if pedidos:
+            df_pedidos = pd.DataFrame([{
+                "id": p.id,
+                "usuario_id": p.usuario_id,
+                "email": next((u[1] for u in users if u[0] == p.usuario_id), "N/A"),
+                "data": p.data,
+                "data_str": p.data.strftime('%d/%m/%Y'),
+                "hora": p.data.strftime('%H:%M'),
+                "status": p.status,
+                "valor": float(p.total),
+                "itens": len(p.itens)
+            } for p in pedidos])
             
-            # Aplicar filtros
-            df_filtrado = df_pedidos.copy()
-            if filtro_status != "Todos":
-                df_filtrado = df_filtrado[df_filtrado['status'] == filtro_status]
-            df_filtrado['data'] = pd.to_datetime(df_filtrado['data'])
-            df_filtrado = df_filtrado[
-                (df_filtrado['data'].dt.date >= data_inicio) & 
-                (df_filtrado['data'].dt.date <= data_fim)
-            ]
-            
-            # Colorir status
-
-            
-            st.dataframe(df_filtrado, use_container_width=True, column_config={
-                "id": "ID",
-                "email": "Email do Usuário",
-                "data": "Data",
-                "status": "Status",
-                "valor": st.column_config.NumberColumn("Valor (R$)", format="%.2f"),
-                "itens": "Nº de Itens"
+            # Adicionar coluna do dia da semana
+            df_pedidos['dia_semana'] = df_pedidos['data'].dt.day_name().map({
+                'Monday': 'Segunda', 'Tuesday': 'Terça', 'Wednesday': 'Quarta',
+                'Thursday': 'Quinta', 'Friday': 'Sexta', 'Saturday': 'Sábado', 'Sunday': 'Domingo'
             })
             
-            # Visualizar detalhes do pedido
-            st.subheader("Detalhes do Pedido")
-            pedido_id = st.selectbox("Selecione um pedido", df_filtrado["id"])
-            if st.button("🔍 Visualizar Itens"):
-                pedido = next((p for p in pedidos if p.id == pedido_id), None)
-                if pedido:
-                    st.write(f"**Detalhes do Pedido ID {pedido_id}**")
-                    st.write(f"**Usuário:** {[u[1] for u in users if u[0] == pedido.usuario_id]}")
-                    st.write(f"**Data:** {pedido.data.strftime('%Y-%m-%d %H:%M')}")
-                    st.write(f"**Status:** {pedido.status}")
-                    st.write(f"**Total:** R${pedido.total:.2f}")
+            # Filtrar apenas dias válidos (terça, quinta, sábado)
+            df_pedidos = df_pedidos[df_pedidos['dia_semana'].isin(['Terça', 'Quinta', 'Sábado'])]
+            
+            if df_pedidos.empty:
+                st.warning("📅 Nenhum pedido encontrado para os dias de funcionamento (Terças, Quintas e Sábados).")
+            else:
+                # === SEÇÃO DE FILTROS ===
+                st.subheader("🔍 Filtros")
+                
+                col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+                
+                with col1:
+                    status_options = ["Todos"] + list(df_pedidos['status'].unique())
+                    filtro_status = st.selectbox("📊 Status", status_options)
+
+                with col2:
+                    datas_validas = obter_datas_validas()
+                    data_inicio_options = ["Todos"] + [d['label'] for d in datas_validas]
+                    filtro_data_inicio = st.selectbox("Dia", data_inicio_options)
+                
+                # Aplicar filtros
+                df_filtrado = df_pedidos.copy()
+                
+                if filtro_status != "Todos":
+                    df_filtrado = df_filtrado[df_filtrado['status'] == filtro_status]
+                
+                if filtro_data_inicio != "Todos":
+                    data_selecionada = next(d['data'] for d in datas_validas if d['label'] == filtro_data_inicio)
+                    df_filtrado = df_filtrado[df_filtrado['data'].dt.date == data_selecionada]
+                
+                
+                # === MÉTRICAS RÁPIDAS ===
+                if not df_filtrado.empty:
+       
+                    with col3:
+                        st.metric(
+                            label="📝 Total de Pedidos",
+                            value=len(df_filtrado),
+                            delta=f"{len(df_filtrado) - len(df_pedidos)} vs. total" if len(df_filtrado) != len(df_pedidos) else None
+                        )
+
                     
-                    # Exibir itens
-                    if pedido.itens:
-                        df_itens = pd.DataFrame([{
-                            "Produto": [p.nome for p in produtos if p.id == item.produto_id],
-                            "Quantidade": item.quantidade,
-                            "Preço Unitário": float(item.preco_unitario),
-                            "Subtotal": float(item.quantidade * item.preco_unitario)
-                        } for item in pedido.itens])
-                        st.dataframe(df_itens, use_container_width=True, column_config={
-                            "Produto": "Produto",
-                            "Quantidade": "Quantidade",
-                            "Preço Unitário": st.column_config.NumberColumn("Preço Unitário (R$)", format="%.2f"),
-                            "Subtotal": st.column_config.NumberColumn("Subtotal (R$)", format="%.2f")
-                        })
+                    with col4:
+                        pedidos_pendentes = len(df_filtrado[df_filtrado['status'] == 'Pendente'])
+                        st.metric(
+                            label="⏳ Pendentes",
+                            value=pedidos_pendentes,
+                        )
+                
+                st.divider()
+                
+                # === TABELA DE PEDIDOS ===
+                st.subheader("📋 Lista de Pedidos")
+                
+                # Preparar dados para exibição
+                df_display = df_filtrado.copy()
+                df_display = df_display.sort_values('data', ascending=False)
+                
+                # Função para colorir status
+                def colorir_status(status):
+                    colors = {
+                        'Pendente': '🟡',
+                        'Aprovado': '🟢', 
+                        'Cancelado': '🔴'
+                    }
+                    return f"{colors.get(status, '⚪')} {status}"
+                
+                df_display['status_icon'] = df_display['status'].apply(colorir_status)
+                
+                # Exibir tabela
+                st.dataframe(
+                    df_display[['id', 'dia_semana', 'data_str', 'email', 'status_icon', 'valor', 'itens']],
+                    use_container_width=True,
+                    column_config={
+                        "id": st.column_config.NumberColumn("ID", width="small"),
+                        "dia_semana": st.column_config.TextColumn("Dia", width="small"),
+                        "data_str": st.column_config.TextColumn("Data", width="small"),
+                        "hora": st.column_config.TextColumn("Hora", width="small"),
+                        "email": st.column_config.TextColumn("Cliente", width="medium"),
+                        "status_icon": st.column_config.TextColumn("Status", width="small"),
+                        "valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f", width="medium"),
+                        "itens": st.column_config.NumberColumn("Itens", width="small")
+                    },
+                    hide_index=True
+                )
+                
+                # === DETALHES DO PEDIDO ===
+                st.divider()
+                st.subheader("🔍 Detalhes do Pedido")
+                
+
+                pedidos_ids = df_filtrado['id'].tolist()
+                pedido_selecionado = st.selectbox(
+                    "Selecione um pedido para visualizar detalhes",
+                    pedidos_ids,
+                    format_func=lambda x: f"Pedido #{x} - {df_filtrado[df_filtrado['id']==x]['email'].iloc[0]}"
+                )
+
+                if  pedido_selecionado:
+                    pedido = next((p for p in pedidos if p.id == pedido_selecionado), None)
+                    
+                    if pedido:
+                        # Card com informações do pedido
+                        with st.container():
+                            st.markdown(f"""
+                            <div style="background-color:  padding: 20px; border-radius: 10px; margin: 10px 0;">
+                                <h4>🛍️ Pedido #{pedido.id}</h4>
+                                <p><strong>👤 Cliente:</strong> {next((u[1] for u in users if u[0] == pedido.usuario_id), 'N/A')}</p>
+                                <p><strong>📅 Data:</strong> {pedido.data.strftime('%d/%m/%Y ')}</p>
+                                <p><strong>📊 Status:</strong> {colorir_status(pedido.status)}</p>
+                                <p><strong>💰 Total:</strong> R$ {pedido.total:.2f}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # Itens do pedido
+                        if pedido.itens:
+                            st.write("**📦 Itens do Pedido:**")
+                            
+                            df_itens = pd.DataFrame([{
+                                "Produto": next((p.nome for p in produtos if p.id == item.produto_id), f"Produto ID {item.produto_id}"),
+                                "Quantidade": item.quantidade,
+                                "Preço Unitário": float(item.preco_unitario),
+                                "Subtotal": float(item.quantidade * item.preco_unitario)
+                            } for item in pedido.itens])
+                            
+                            st.dataframe(
+                                df_itens,
+                                use_container_width=True,
+                                column_config={
+                                    "Produto": st.column_config.TextColumn("🛍️ Produto", width="small"),
+                                    "Quantidade": st.column_config.NumberColumn("📊 Qtd", width="small"),
+                                    "Preço Unitário": st.column_config.NumberColumn("💰 Preço Unit.", format="R$ %.2f"),
+                                    "Subtotal": st.column_config.NumberColumn("💰 Subtotal", format="R$ %.2f")
+                                },
+                                hide_index=True
+                            )
+                        else:
+                            st.warning("📦 Nenhum item encontrado para este pedido.")
                     else:
-                        st.warning("Nenhum item encontrado para este pedido.")
-                else:
-                    st.error(f"Pedido ID {pedido_id} não encontrado.")
-            st.write("---")
-            # Ações rápidas
-            st.subheader("Ações Rápidas")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                pedido_id_excluir = st.number_input("ID do Pedido para Excluir", min_value=1, step=1)
-                if st.button("🗑️ Excluir Pedido"):
-                    if excluir_pedido(pedido_id_excluir):
-                        time.sleep(2)
-                        st.success(f"Pedido ID {pedido_id_excluir} excluído com sucesso!")
-                        att_data(pedidos=True)
-                    else:
-                        st.error(f"Pedido ID {pedido_id_excluir} não encontrado.")
+                        st.error(f"❌ Pedido #{pedido_selecionado} não encontrado.")
+                
+                # Botões em linha única para melhor visualização mobile
+                col1, col2 = st.columns(2)
+
+                if not 'editar_excluir_pedido' in st.session_state:
+                    st.session_state.editar_excluir_pedido = None
+                if st.session_state.editar_excluir_pedido == None:
+                    
+                    with col1:
+                        if st.button("📝 Editar Status", use_container_width=True, type="primary"):
+                            st.session_state.editar_excluir_pedido = 'Editar'
+                            st.rerun()
+
+                    with col2:
+                        if st.button("🗑️ Excluir Pedido", use_container_width=True, type="secondary"):
+                            st.session_state.editar_excluir_pedido = 'Excluir'
+                            st.rerun()
+
+                # === SEÇÃO DE EDIÇÃO DE STATUS ===
+                if st.session_state.editar_excluir_pedido == 'Editar':
+                    st.write("**📝 Alterar Status do Pedido**")
+                    
+                    # Botões de status em formato de grid 2x2 (melhor para mobile)
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        if st.button("✅ Aprovar", 
+                                    use_container_width=True, 
+                                    type="primary",
+                                    help="Marcar pedido como aprovado"):
+                            atualizar_status_pedido(pedido_selecionado, "Aprovado")
+                            st.session_state.editar_excluir_pedido = None
+                            st.success("Status atualizado para Aprovado!")
+                            time.sleep(1)
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button("❌ Cancelar", 
+                                    use_container_width=True, 
+                                    type="secondary",
+                                    help="Marcar pedido como cancelado"):
+                            atualizar_status_pedido(pedido_selecionado, "Cancelado")
+                            st.session_state.editar_excluir_pedido = None
+                            st.success("Status atualizado para Cancelado!")
+                            time.sleep(1)
+                            st.rerun()
+                    
+                    # Segunda linha de botões
+                    col3, col4 = st.columns(2)
+                    
+                    with col3:
+                        if st.button("⏳ Pendente", 
+                                    use_container_width=True,
+                                    help="Marcar pedido como pendente"):
+                            atualizar_status_pedido(pedido_selecionado, "Pendente")
+                            st.session_state.editar_excluir_pedido = None
+                            st.success("Status atualizado para Pendente!")
+                            time.sleep(1)
+                            st.rerun()
+                    
+                    with col4:
+                        if st.button("↩️ Voltar", 
+                                    use_container_width=True):
+                            st.session_state.editar_excluir_pedido = None
+                            st.rerun()
+
+                # === SEÇÃO DE EXCLUSÃO ===
+                elif st.session_state.editar_excluir_pedido == 'Excluir':
+                    st.warning("⚠️ **Confirmar Exclusão do Pedido**")
+                    st.write(f"Você tem certeza que deseja excluir o pedido #{pedido_selecionado}?")
+                    st.write("⚠️ **Esta ação não pode ser desfeita!**")
+                    
+                    # Botões de confirmação em linha
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        if st.button("🗑️ Confirmar Exclusão", 
+                                    use_container_width=True, 
+                                    type="primary"):
+                            if excluir_pedido(pedido_selecionado):
+                                st.success(f"✅ Pedido #{pedido_selecionado} excluído com sucesso!")
+                                st.session_state.editar_excluir_pedido = None
+                                time.sleep(2)
+                                att_data(pedidos=True)
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Erro ao excluir pedido #{pedido_selecionado}")
+                    
+                    with col2:
+                        if st.button("↩️ Cancelar", 
+                                    use_container_width=True, 
+                                    type="secondary"):
+                            st.session_state.editar_excluir_pedido = None
+                            st.rerun()
+
+        
+        else:
+            st.info("📝 Nenhum pedido cadastrado ainda. Use a aba 'Criar Pedido' para adicionar o primeiro pedido.")
     
     with tab2:
         st.subheader("Criar Novo Pedido")
