@@ -4,7 +4,7 @@ from datetime import datetime, date
 import plotly.express as px
 from app.crud import adicionar_produto, listar_produtos, atualizar_produto, excluir_produto, criar_pedido, listar_pedidos, atualizar_status_pedido, excluir_pedido, listar_usuarios
 from app.crud import get_user_by_id, get_produto_by_id
-
+from app.auth import atualizar_username_usuario
 from app.models import ProdutoCreate, PedidoCreate, ItemPedidoCreate
 from typing import List
 import time
@@ -18,7 +18,7 @@ def att_data(pedidos= False, produtos= False, users=False):
         st.session_state.users = listar_usuarios()
     st.rerun()
 
-def render(menu_option):
+def render():
     """Renderiza a página do administrador baseada na opção do menu"""
     # st.title("🔧 Painel Administrativo")
     # Listar pedidos
@@ -33,13 +33,12 @@ def render(menu_option):
     if 'produtos' not in st.session_state:
         st.session_state.produtos = listar_produtos()
     
-    if menu_option == "Produtos":
-        render_produtos()
-    elif menu_option == "Pedidos":
-        render_pedidos()
-    else:
-        st.warning("Funcionalidade de gerenciamento de usuários não implementada.")
-
+    pg = st.navigation([
+        st.Page(render_produtos, title="Produtos", icon="👤"),
+        st.Page(render_pedidos, title="Pedidos", icon="🛠️"),
+        st.Page(pagina_configuracoes, title="Configurações", icon="⚙️")
+    ])
+    pg.run()
 def render_produtos():
     """Tela de gerenciamento de produtos"""
     st.header("📦 Gerenciamento de Produtos")
@@ -205,6 +204,7 @@ def render_produtos():
                 st.plotly_chart(fig_preco, use_container_width=True)
 
 def render_pedidos():
+
     """Tela de gerenciamento de pedidos"""
     st.header("📋 Gerenciamento de Pedidos")
     produtos = st.session_state.produtos
@@ -471,3 +471,37 @@ def render_pedidos():
                     title='Vendas por Dia'
                 )
                 st.plotly_chart(fig_vendas, use_container_width=True)
+
+def pagina_configuracoes():
+    st.header("⚙️ Configurações da Conta")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write(f"**Email:** {st.session_state.email}")
+        st.write(f"**Username:** {st.session_state.username}")
+
+    with col2:
+        if "mostrar_input_username" not in st.session_state:
+            st.session_state.mostrar_input_username = False
+
+        if st.button("Alterar Nome", key="alterar_username2"):
+            st.session_state.mostrar_input_username = True
+
+        if st.session_state.mostrar_input_username:
+            novo_username = st.text_input(
+                "Nome de usuário",
+                key="novo_username_input",
+                placeholder="Digite seu nome de usuário (3-20 caracteres)",
+                help="Apenas letras, números, _ e - são permitidos"
+            )
+
+            if novo_username and novo_username != st.session_state.username:
+                if st.button("✅ Confirmar", key="confirmar_username"):
+                    if atualizar_username_usuario(st.session_state['email'], novo_username):
+                        st.success("Username atualizado com sucesso!")
+                        st.session_state.username = novo_username
+                        st.session_state.mostrar_input_username = False
+                    else:
+                        st.error("Este nome já está em uso ou ocorreu um erro.")
+            elif novo_username == st.session_state.username:
+                st.info("O novo username é igual ao atual.")

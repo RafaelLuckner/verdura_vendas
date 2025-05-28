@@ -95,7 +95,7 @@ def main():
     init_db()
     st.set_page_config(
         page_title="Login - Sistema de Vendas",
-        page_icon="🔐",
+        page_icon="🥬",
     )
     inicializar_sessao()
 
@@ -154,7 +154,6 @@ def mostrar_tela_username():
     
     with col1:
         if st.button("✅ Confirmar", type="primary", use_container_width=True):
-            username = username.replace(' ', '_')
             if validar_username(username):
                 # Tenta atualizar o username no banco
                 if atualizar_username_usuario(st.session_state.google_user['email'], username):
@@ -184,31 +183,19 @@ def mostrar_tela_username():
 def mostrar_area_logada():
     """Exibe a área principal do sistema após login completo"""
     # Header com informações do usuário
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        if st.session_state.google_user:
-            st.write(f"**{st.session_state.google_user.get('username', 'Usuário')}**")
-            st.caption(f"{st.session_state.google_user.get('email', '')}")
-        else:
-            st.write(f"**Olá, {st.session_state.username or st.session_state.email}!**")
-    
-    with col2:
-        if st.button("🔓 Sair", use_container_width=True):
-            fazer_logout()
-            st.rerun()
-    
-    st.divider()
+
+    st.sidebar.write(f"Nome: {st.session_state['username']}")
+    st.sidebar.write(f"Email: {st.session_state['email']}")
+    st.sidebar.write(f"---")
+    st.sidebar.button("🔓 Sair", on_click=fazer_logout, use_container_width=True)
+
+
     
     # Sidebar para administradores
     if st.session_state.is_admin:
         with st.sidebar:
             st.success("🔐 Acesso Administrativo")
-            menu_option = st.radio(
-                "Menu Administrativo",
-                ["Produtos", "Pedidos", "Usuários"]
-            )
-        admin_page(menu_option)
+        admin_page()
     else:
         user_page()
 

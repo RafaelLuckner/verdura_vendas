@@ -1,3 +1,4 @@
+from narwhals import col
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
@@ -7,8 +8,18 @@ import time
 from itertools import zip_longest
 from streamlit_elements import elements, mui, html
 
+from app.auth import atualizar_username_usuario
 
+def validar_username(username):
+    """Valida se o username é válido"""
+    if not username or len(username) < 3:
+        st.error("Nome de usuário deve ter pelo menos 3 caracteres.")
+        return False
+    if len(username) > 20:
+        st.error("Nome de usuário deve ter no máximo 20 caracteres.")
+        return False
 
+    return True
 def att_data( produtos=False, pedidos_by_user=False):
     """Atualiza os dados na sessão"""
 
@@ -23,28 +34,30 @@ def render():
     if 'user_id' not in st.session_state:
         st.session_state.user_id = get_user_by_email(st.session_state.email)
     user_id = st.session_state.user_id
-    """Renderiza a página do usuário"""
-    st.title(f"🛒 {st.session_state.email.split('@')[0]}")
+
     
     if 'produtos' not in st.session_state:
         st.session_state.produtos = listar_produtos()
     if 'pedidos_by_user' not in st.session_state:
         st.session_state.pedidos_by_user = get_pedidos_by_user(st.session_state.user_id)
     
-    # Botão de atualizar no topo
-    if st.button("🔄 Atualizar"):
-        att_data(produtos=True, pedidos_by_user=True)
-    
+    pg = st.navigation([
+        st.Page(render_pedidos, title="Pedidos", icon="🛠️"),
+        st.Page(pagina_configuracoes, title="Configurações", icon="⚙️")
+    ])
+    pg.run()
+
+def render_pedidos():
     # Abas principais
     tab1, tab2 = st.tabs(["🆕 Novo Pedido", "📋 Meus Pedidos"])
     
     with tab1:
-        render_novo_pedido(user_id)
+        render_novo_pedido()
     
     with tab2:
-        render_meus_pedidos(user_id)
+        render_meus_pedidos()
 
-def render_novo_pedido(user_id):
+def render_novo_pedido():
     """Renderiza a aba de criar novo pedido"""
     st.header("🛒 Novo Pedido")
 
@@ -180,7 +193,7 @@ def render_novo_pedido(user_id):
                     data=dia_entrega,
                     status="Pendente",
                     total=total,
-                    usuario_id=user_id,
+                    usuario_id=st.session_state['user_id'],
                     itens=itens_pedido
                 )
 
@@ -195,7 +208,7 @@ def render_novo_pedido(user_id):
     else:
         st.info("👆 Para começar, selecione a quantidade de um ou mais produtos acima, ou visualize seus pedidos na aba Meus Pedidos")
 
-def render_meus_pedidos(user_id):
+def render_meus_pedidos():
     """Renderiza a aba dos pedidos do usuário"""
     st.header("Meus Pedidos")
     
@@ -259,3 +272,36 @@ def render_meus_pedidos(user_id):
                         st.error("Erro ao cancelar pedido.")
 
 
+def pagina_configuracoes():
+    st.header("⚙️ Configurações da Conta")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write(f"**Email:** {st.session_state.email}")
+        st.write(f"**Nome:** {st.session_state.username}")
+
+    with col2:
+        if "mostrar_input_username" not in st.session_state:
+            st.session_state.mostrar_input_username = False
+
+        if st.button("Alterar Nome", key="alterar_username2"):
+            st.session_state.mostrar_input_username = True
+
+        if st.session_state.mostrar_input_username:
+            novo_username = st.text_input(
+                "Nome de usuário",
+                key="novo_username_input",
+                placeholder="Digite seu nome de usuário (3-20 caracteres)",
+                help="Apenas letras, números, _ e - são permitidos"
+            )
+
+            if novo_username and novo_username != st.session_state.username:
+                if st.button("✅ Confirmar", key="confirmar_username"):
+                    if atualizar_username_usuario(st.session_state['email'], novo_username):
+                        st.success("Username atualizado com sucesso!")
+                        st.session_state.username = novo_username
+                        st.session_state.mostrar_input_username = False
+                    else:
+                        st.error("Este nome já está em uso ou ocorreu um erro.")
+            elif novo_username == st.session_state.username:
+                st.info("O novo username é igual ao atual.")
