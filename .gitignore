@@ -1,8 +1,9 @@
 *.env
-*.streamlit
+.streamlit
 vendas.db
 google*
 *__pycache__
 *.python*
 *.json*
 *test*
+.vscode

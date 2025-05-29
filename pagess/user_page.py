@@ -35,11 +35,7 @@ def render():
         st.session_state.user_id = get_user_by_email(st.session_state.email)
     user_id = st.session_state.user_id
 
-    if 'produtos' not in st.session_state:
-        st.session_state.produtos = listar_produtos()
-    if 'pedidos_by_user' not in st.session_state:
-        st.session_state.pedidos_by_user = get_pedidos_by_user(st.session_state.user_id)
-    
+
     pg = st.navigation([
         st.Page(render_novo_pedido, title="Novo Pedido", icon="🥬",),
         st.Page(render_meus_pedidos, title="Meus Pedidos", icon="📋"),
@@ -50,6 +46,8 @@ def render():
 
 def render_novo_pedido():
     """Renderiza a aba de criar novo pedido"""
+    if 'produtos' not in st.session_state:
+        st.session_state.produtos = listar_produtos()
     st.header("🛒 Novo Pedido")
 
     produtos = st.session_state.produtos
@@ -263,7 +261,9 @@ def render_novo_pedido():
 
 def render_meus_pedidos():
     """Renderiza a aba dos pedidos do usuário - Versão Mobile Otimizada"""
-
+    if 'pedidos_by_user' not in st.session_state:
+        st.session_state.pedidos_by_user = get_pedidos_by_user(st.session_state.user_id)
+    
 
     # Filtrar pedidos do usuário
     meus_pedidos = st.session_state.pedidos_by_user

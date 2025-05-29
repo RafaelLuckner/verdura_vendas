@@ -4,10 +4,8 @@ import pandas as pd
 from datetime import datetime, date
 import plotly.express as px
 from app.crud import adicionar_produto, listar_produtos, atualizar_produto, excluir_produto, criar_pedido, listar_pedidos, atualizar_status_pedido, excluir_pedido, listar_usuarios
-from app.crud import get_user_by_id, get_produto_by_id
 from app.auth import atualizar_username_usuario
 from app.models import ProdutoCreate, PedidoCreate, ItemPedidoCreate
-from typing import List
 import time
 
 def att_data(pedidos= False, produtos= False, users=False):

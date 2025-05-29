@@ -98,6 +98,7 @@ def main():
     st.set_page_config(
         page_title="Login - Sistema de Vendas",
         page_icon="🥬",
+        initial_sidebar_state="expanded"
     )
     inicializar_sessao()
 

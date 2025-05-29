@@ -3,7 +3,7 @@ from psycopg2 import sql
 from dotenv import load_dotenv
 import os
 import streamlit as st
-
+st.secrets
 load_dotenv()
 
 USER = st.secrets["postgres"]["user"]
