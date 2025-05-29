@@ -35,27 +35,18 @@ def render():
         st.session_state.user_id = get_user_by_email(st.session_state.email)
     user_id = st.session_state.user_id
 
-    
     if 'produtos' not in st.session_state:
         st.session_state.produtos = listar_produtos()
     if 'pedidos_by_user' not in st.session_state:
         st.session_state.pedidos_by_user = get_pedidos_by_user(st.session_state.user_id)
     
     pg = st.navigation([
-        st.Page(render_pedidos, title="Pedidos", icon="🛠️"),
+        st.Page(render_novo_pedido, title="Novo Pedido", icon="🥬",),
+        st.Page(render_meus_pedidos, title="Meus Pedidos", icon="📋"),
         st.Page(pagina_configuracoes, title="Configurações", icon="⚙️")
     ])
     pg.run()
 
-def render_pedidos():
-    # Abas principais
-    tab1, tab2 = st.tabs(["🆕 Novo Pedido", "📋 Meus Pedidos"])
-    
-    with tab1:
-        render_novo_pedido()
-    
-    with tab2:
-        render_meus_pedidos()
 
 def render_novo_pedido():
     """Renderiza a aba de criar novo pedido"""
@@ -261,12 +252,14 @@ def render_novo_pedido():
                             st.error(f"⚠️ Ocorreu um erro ao criar o pedido: {str(e)}")
                             print('erro ao criar pedido')
 
-    if 'ja_pediu' in st.session_state and st.session_state.ja_pediu:
+    if 'ja_pediu' not in st.session_state:
+        st.session_state.ja_pediu = False
+    if st.session_state.ja_pediu:
         st.success("✅ Pedido criado com sucesso!")
         st.info("📦 Seus pedidos podem ser visualizados na aba Meus Pedidos")
 
     elif not st.session_state.ja_pediu and not st.session_state.mostrar_confirmacao:
-        st.info("👆 Para começar, selecione a quantidade de um ou mais produtos acima e clique em confirmar pedido, ou visualize seus pedidos na aba Meus Pedidos")
+        st.info("👆 Para começar, selecione a quantidade de um ou mais produtos acima e clique em confirmar pedido, ou visualize seus pedidos em Meus Pedidos na aba superior esquerda.")
 
 def render_meus_pedidos():
     """Renderiza a aba dos pedidos do usuário - Versão Mobile Otimizada"""
