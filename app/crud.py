@@ -88,8 +88,8 @@ def criar_pedido(pedido: PedidoCreate) -> int:
 
             data_str = pedido.data.strftime('%Y-%m-%d %H:%M:%S')
             cursor.execute(
-                'INSERT INTO pedidos (data, status, total, usuario_id) VALUES (%s, %s, %s, %s) RETURNING id',
-                (data_str, pedido.status, float(total), pedido.usuario_id)
+                'INSERT INTO pedidos (data, status, total, usuario_id, observacoes) VALUES (%s, %s, %s, %s, %s) RETURNING id',
+                (data_str, pedido.status, float(total), pedido.usuario_id, pedido.observacoes)
             )
             pedido_id = cursor.fetchone()[0]
 

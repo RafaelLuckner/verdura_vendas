@@ -71,7 +71,10 @@ def render_novo_pedido():
     # Inicializar carrinho se ainda não existir
     if 'carrinho' not in st.session_state:
         st.session_state.carrinho = {}
-    # Faça uma cópia local
+    
+    # Inicializar estado de confirmação
+    if 'mostrar_confirmacao' not in st.session_state:
+        st.session_state.mostrar_confirmacao = False
 
     # Campo de pesquisa
     termo_pesquisa = st.text_input("🔍 Pesquisar produto", placeholder="Digite o nome do produto...").strip().lower()
@@ -134,7 +137,6 @@ def render_novo_pedido():
                         "Quantidade",
                         min_value=0,
                         step=1,
-                        value=st.session_state.carrinho.get(produto.id, 0),
                         key=f"qtd_{produto.id}_{produto.nome}",
                         label_visibility="collapsed"
                     )
@@ -142,7 +144,6 @@ def render_novo_pedido():
                     # Atualiza o carrinho
                     if qtd > 0:
                         st.session_state.carrinho[produto.id] = qtd
-                        st.write(st.session_state.carrinho[produto.id] )
 
                     elif produto.id in st.session_state.carrinho:
                         del st.session_state.carrinho[produto.id]
@@ -171,7 +172,7 @@ def render_novo_pedido():
                 preco_unitario=produto.preco
             ))
 
-        st.markdown(f"### Total a pagar: **R$ {total:.2f}**")
+        st.markdown(f"### Total: **R$ {total:.2f}**")
         
         st.write('---')
         st.subheader("📅 Escolha o dia da feira")
@@ -188,32 +189,84 @@ def render_novo_pedido():
         data_selecionada = st.selectbox("Disponível para entrega em:", opcoes_data)
         dia_entrega = datas_validas[opcoes_data.index(data_selecionada)]
 
+        if 'observacao' not in st.session_state:
+            st.session_state.observacao = ""
 
-        if st.button("✅ Finalizar Pedido", type="primary", use_container_width=True):
-            try:
-                pedido = PedidoCreate(
-                    data=dia_entrega,
-                    status="Pendente",
-                    total=total,
-                    usuario_id=st.session_state['user_id'],
-                    itens=itens_pedido
-                )
+        # Campo de observação
+        st.subheader("📝 Observações (opcional)")
+        observacao = st.text_area(
+            "Deixe aqui alguma observação sobre seu pedido:",
+            placeholder="Ex: Entregue no final da tarde no veiculo de placa XXXX.",
+            height=80,
+            key="observacao_pedido"
+        )
+        st.session_state.observacao = observacao
 
-                criar_pedido(pedido)
-                st.session_state.ja_pediu = True
-                st.session_state.carrinho = {}
-                att_data(pedidos_by_user=True)
-                st.rerun()
+        # Botão para mostrar confirmação
+        if st.button("🛒 Confirmar Pedido", type="primary", use_container_width=True):
+            st.session_state.mostrar_confirmacao = True
+            st.session_state.ja_pediu = False
+            st.rerun()
 
-            except Exception as e:
-                st.error(f"⚠️ Ocorreu um erro ao criar o pedido: {str(e)}")
+        # Modal de confirmação
+        if st.session_state.mostrar_confirmacao:
+            st.write('---')
+            st.subheader("✅ Confirmação do Pedido")
+            
+            with st.container(border=True):
+                st.markdown("### 📋 **Detalhes do seu pedido:**")
+                
+                # Resumo dos itens
+                for produto_id, quantidade in st.session_state.carrinho.items():
+                    produto = next(p for p in produtos_ativos if p.id == produto_id)
+                    subtotal = quantidade * float(produto.preco)
+                    st.markdown(f"• **{produto.nome}** – {quantidade} {produto.unidade} × {produto.preco:.2f} = R$  {subtotal:.2f}")
+                
+                st.markdown(f"### 💰 **Total:** \n **R$ {total:.2f}**")
+                st.markdown(f"### 📅 **Data de entrega:** \n {dias_pt[dia_entrega.weekday()]} - {dia_entrega.strftime('%d/%m/%Y')}")
+                
+                if observacao.strip():
+                    st.markdown(f"### 📝 **Observações:** \n {observacao}")
 
-    elif 'ja_pediu' in st.session_state and st.session_state.ja_pediu:
+                st.markdown("---")
+                st.markdown("**Confirme os dados acima antes de finalizar seu pedido.**")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if st.button("❌ Cancelar", use_container_width=True):
+                        st.session_state.mostrar_confirmacao = False
+                        st.rerun()
+                
+                with col2:
+                    if st.button("✅ Confirmar Pedido", type="primary", use_container_width=True):
+                        try:
+
+                            pedido = PedidoCreate(
+                                data=dia_entrega,
+                                status="Pendente",
+                                total=total,
+                                usuario_id=st.session_state['user_id'],
+                                itens=itens_pedido,
+                                observacoes=st.session_state.observacao.strip() if observacao.strip() else None
+                            )
+                            criar_pedido(pedido)
+                            st.session_state.ja_pediu = True
+                            st.session_state.carrinho = {}
+                            st.session_state.mostrar_confirmacao = False
+                            att_data(pedidos_by_user=True)
+                            st.rerun()
+
+                        except Exception as e:
+                            st.error(f"⚠️ Ocorreu um erro ao criar o pedido: {str(e)}")
+                            print('erro ao criar pedido')
+
+    if 'ja_pediu' in st.session_state and st.session_state.ja_pediu:
         st.success("✅ Pedido criado com sucesso!")
         st.info("📦 Seus pedidos podem ser visualizados na aba Meus Pedidos")
 
-    else:
-        st.info("👆 Para começar, selecione a quantidade de um ou mais produtos acima, ou visualize seus pedidos na aba Meus Pedidos")
+    elif not st.session_state.ja_pediu and not st.session_state.mostrar_confirmacao:
+        st.info("👆 Para começar, selecione a quantidade de um ou mais produtos acima e clique em confirmar pedido, ou visualize seus pedidos na aba Meus Pedidos")
 
 def render_meus_pedidos():
     """Renderiza a aba dos pedidos do usuário - Versão Mobile Otimizada"""

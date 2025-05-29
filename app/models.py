@@ -42,12 +42,11 @@ class ItemPedidoDB(ItemPedidoBase):
 class ItemPedidoCreate(ItemPedidoBase):
     pass
 
-
-
 class PedidoBase(BaseModel):
     data: datetime
-    status: Literal["Pendente", "Aprovado", "Cancelado", "Entregue"] = "Pendente"
+    status: Literal["Pendente", "Aprovado", "Cancelado"] = "Pendente"
     total: Optional[condecimal(ge=0, max_digits=12, decimal_places=2)] = None  # Total opcional, calculado no backend
+    observacoes: Optional[constr(max_length=500)] = None  # Campo de observações opcional com limite de 500 caracteres
 
 class PedidoCreate(PedidoBase):
     usuario_id: conint(gt=0)  # Garante que usuario_id seja um inteiro positivo

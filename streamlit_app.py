@@ -91,7 +91,10 @@ def finalizar_login(email, nome, username):
     
 
 def main():
-    init_db()
+    # Inicializa o banco
+    if "db" not in st.session_state:
+        st.session_state.db = None
+        init_db()   
     st.set_page_config(
         page_title="Login - Sistema de Vendas",
         page_icon="🥬",
@@ -112,7 +115,7 @@ def main():
 
 def mostrar_tela_login():
     """Exibe a tela de login apenas com Google"""
-    st.title("🥬 Vendas Verduras Flora")
+    st.title("🥬 Vendas Verduras")
     st.subheader("Faça login com sua conta Google")
     
     # Informações sobre o sistema
@@ -166,8 +169,8 @@ def mostrar_tela_username():
                     st.error("Nome de usuário já está em uso. Tente outro.")
     
     with col2:
-        if st.button("🔄 Usar nome do Google", use_container_width=True):
-            nome_google = st.session_state.google_user.get('name', '').replace(' ', '_')
+        if st.button("Usar nome do Google", use_container_width=True):
+            nome_google = st.session_state.google_user.get('name', '')
             if validar_username(nome_google):
                 if atualizar_username_usuario(st.session_state.google_user['email'], nome_google):
                     finalizar_login(
@@ -193,7 +196,7 @@ def mostrar_area_logada():
     # Sidebar para administradores
     if st.session_state.is_admin:
         with st.sidebar:
-            st.success("🔐 Acesso Administrativo")
+            st.success("Acesso Administrativo")
         admin_page()
     else:
         user_page()
