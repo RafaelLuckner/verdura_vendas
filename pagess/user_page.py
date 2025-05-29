@@ -33,7 +33,6 @@ def att_data( produtos=False, pedidos_by_user=False):
 def render():
     if 'user_id' not in st.session_state:
         st.session_state.user_id = get_user_by_email(st.session_state.email)
-    user_id = st.session_state.user_id
 
 
     pg = st.navigation([
@@ -264,7 +263,8 @@ def render_meus_pedidos():
     if 'pedidos_by_user' not in st.session_state:
         st.session_state.pedidos_by_user = get_pedidos_by_user(st.session_state.user_id)
     
-
+    if 'produtos' not in st.session_state:
+        st.session_state.produtos = listar_produtos()
     # Filtrar pedidos do usuário
     meus_pedidos = st.session_state.pedidos_by_user
     if not meus_pedidos:
@@ -429,7 +429,6 @@ def render_meus_pedidos():
                         
                         # Ações do pedido
                         if pedido.status == "Pendente":
-                            st.markdown("---")
                             st.write("**⚡ Ações Disponíveis:**")
                             
                             # Confirmação de cancelamento
